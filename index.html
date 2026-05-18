@@ -1,155 +1,237 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Semplice Pong JS</title>
-    <style>
-        body {
-            margin: 0;
-            background-color: #222;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: Arial, sans-serif;
-            overflow: hidden;
-        }
-        canvas {
-            border: 4px solid #fff;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            background-color: #000;
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            text-align: center;
-            pointer-events: none;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semplice Pong JS con Audio</title>
+<style>
+body {
+margin: 0;
+background-color: #222;
+display: flex;
+justify-content: center;
+align-items: center;
+height: 100vh;
+color: white;
+font-family: Arial, sans-serif;
+overflow: hidden;
+}
+canvas {
+border: 4px solid #fff;
+box-shadow: 0 0 20px rgba(0,0,0,0.5);
+background-color: #000;
+}
+#ui {
+position: absolute;
+top: 20px;
+text-align: center;
+pointer-events: none;
+}
+</style>
 </head>
 <body>
+<div id="ui">
+<h1>PONG</h1>
+<p>Usa le frecce su/giù o W/S per muoverti</p>
+</div>
+<canvas id="pongCanvas"></canvas>
 
-    <div id="ui">
-        <h1>PONG</h1>
-        <p>Usa le frecce su/giù o W/S per muoverti</p>
-    </div>
-    <canvas id="pongCanvas"></canvas>
+<script>
+const canvas = document.getElementById("pongCanvas");
+const ctx = canvas.getContext("2d");
 
-    <script>
-        const canvas = document.getElementById("pongCanvas");
-        const ctx = canvas.getContext("2d");
+// Configurazione dimensioni
+canvas.width = 800;
+canvas.height = 400;
 
-        // Configurazione dimensioni
-        canvas.width = 800;
-        canvas.height = 400;
+// Proprietà della racchetta
+const paddleWidth = 10, paddleHeight = 80;
+let leftPaddleY = (canvas.height - paddleHeight) / 2;
+let rightPaddleY = (canvas.height - paddleHeight) / 2;
+const paddleSpeed = 8;
 
-        // Proprietà della racchetta
-        const paddleWidth = 10, paddleHeight = 80;
-        let leftPaddleY = (canvas.height - paddleHeight) / 2;
-        let rightPaddleY = (canvas.height - paddleHeight) / 2;
-        const paddleSpeed = 8;
+// Proprietà della pallina
+let ballX = canvas.width / 2;
+let ballY = canvas.height / 2;
+let ballSize = 8;
+let ballSpeedX = 5;
+let ballSpeedY = 5;
 
-        // Proprietà della pallina
-        let ballX = canvas.width / 2;
-        let ballY = canvas.height / 2;
-        let ballSize = 8;
-        let ballSpeedX = 5;
-        let ballSpeedY = 5;
+// Punteggio e stato del gioco
+let leftScore = 0;
+let rightScore = 0;
+const maxScore = 5; // Il punteggio necessario per vincere la partita
+let gameOver = false;
 
-        // Punteggio
-        let leftScore = 0;
-        let rightScore = 0;
+// --- CARICAMENTO AUDIO ---
+const sndPallina = new Audio("Pallina colpita.wav");
+const sndGoalUno = new Audio("Goal di uno.wav");
+const sndGoalAltro = new Audio("Goal dell'altro.wav");
+const sndPuntiUno = new Audio("Punteggio di uno.wav");
+const sndPuntiAltro = new Audio("Punteggio dell'altro.mp3");
+const sndVittoria = new Audio("Vittoria.wav");
+const sndSconfitta = new Audio("Sconfitta.wav");
+const sndSottofondo = new Audio("Musichetta in sottofondo.wav");
 
-        // Input tastiera
-        const keys = {};
-        window.addEventListener("keydown", (e) => keys[e.key] = true);
-        window.addEventListener("keyup", (e) => keys[e.key] = false);
+// Configura la musica di sottofondo in loop e a volume più basso
+sndSottofondo.loop = true;
+sndSottofondo.volume = 0.4; 
 
-        function update() {
-            // Movimento racchetta sinistra (Giocatore)
-            if ((keys["w"] || keys["W"]) && leftPaddleY > 0) leftPaddleY -= paddleSpeed;
-            if ((keys["s"] || keys["S"]) && leftPaddleY < canvas.height - paddleHeight) leftPaddleY += paddleSpeed;
+let musicStarted = false;
 
-            // Movimento racchetta destra (IA semplice)
-            let centerPaddle = rightPaddleY + paddleHeight / 2;
-            if (centerPaddle < ballY - 10) rightPaddleY += paddleSpeed * 0.7;
-            else if (centerPaddle > ballY + 10) rightPaddleY -= paddleSpeed * 0.7;
+// Input tastiera
+const keys = {};
+window.addEventListener("keydown", (e) => {
+    keys[e.key] = true;
+    
+    // Fai partire la musica al primo input dell'utente (aggira il blocco del browser)
+    if (!musicStarted && !gameOver) {
+        sndSottofondo.play().catch(err => console.log("Audio in attesa di interazione"));
+        musicStarted = true;
+    }
+});
+window.addEventListener("keyup", (e) => keys[e.key] = false);
 
-            // Movimento pallina
-            ballX += ballSpeedX;
-            ballY += ballSpeedY;
+function update() {
+if (gameOver) return;
 
-            // Rimbalzo bordi sopra e sotto
-            if (ballY <= 0 || ballY >= canvas.height) ballSpeedY = -ballSpeedY;
+// Movimento racchetta sinistra (Giocatore)
+if ((keys["w"] || keys["W"]) && leftPaddleY > 0) leftPaddleY -= paddleSpeed;
+if ((keys["s"] || keys["S"]) && leftPaddleY < canvas.height - paddleHeight) leftPaddleY += paddleSpeed;
 
-            // Collisione racchetta sinistra
-            if (ballX <= paddleWidth) {
-                if (ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) {
-                    ballSpeedX = -ballSpeedX;
-                    ballSpeedX *= 1.05; // Aumenta velocità a ogni colpo
-                } else {
-                    rightScore++;
-                    resetBall();
-                }
-            }
+// Movimento racchetta destra (IA semplice)
+let centerPaddle = rightPaddleY + paddleHeight / 2;
+if (centerPaddle < ballY - 10) rightPaddleY += paddleSpeed * 0.7;
+else if (centerPaddle > ballY + 10) rightPaddleY -= paddleSpeed * 0.7;
 
-            // Collisione racchetta destra
-            if (ballX >= canvas.width - paddleWidth) {
-                if (ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) {
-                    ballSpeedX = -ballSpeedX;
-                    ballSpeedX *= 1.05;
-                } else {
-                    leftScore++;
-                    resetBall();
-                }
-            }
-        }
+// Movimento pallina
+ballX += ballSpeedX;
+ballY += ballSpeedY;
 
-        function resetBall() {
-            ballX = canvas.width / 2;
-            ballY = canvas.height / 2;
-            ballSpeedX = -ballSpeedX > 0 ? 5 : -5;
-            ballSpeedY = 5;
-        }
+// Rimbalzo bordi sopra e sotto
+if (ballY <= 0 || ballY >= canvas.height) {
+    ballSpeedY = -ballSpeedY;
+    // Usiamo una copia per permettere rimbalzi ripetuti ravvicinati senza tagliare l'audio
+    sndPallina.cloneNode(true).play(); 
+}
 
-        function draw() {
-            // Sfondo
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+// Collisione racchetta sinistra (Giocatore)
+if (ballX <= paddleWidth) {
+    if (ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) {
+        ballSpeedX = -ballSpeedX;
+        ballSpeedX *= 1.05; // Aumenta velocità a ogni colpo
+        sndPallina.cloneNode(true).play();
+    } else {
+        // Punto dell'IA (Destra)
+        rightScore++;
+        sndGoalAltro.play();
+        sndPuntiAltro.play();
+        checkGameEnd();
+        if (!gameOver) resetBall();
+    }
+}
 
-            // Linea centrale
-            ctx.setLineDash([10, 10]);
-            ctx.strokeStyle = "rgba(255,255,255,0.2)";
-            ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 0);
-            ctx.lineTo(canvas.width / 2, canvas.height);
-            ctx.stroke();
+// Collisione racchetta destra (IA)
+if (ballX >= canvas.width - paddleWidth) {
+    if (ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) {
+        ballSpeedX = -ballSpeedX;
+        ballSpeedX *= 1.05;
+        sndPallina.cloneNode(true).play();
+    } else {
+        // Punto del Giocatore (Sinistra)
+        leftScore++;
+        sndGoalUno.play();
+        sndPuntiUno.play();
+        checkGameEnd();
+        if (!gameOver) resetBall();
+    }
+}
+}
 
-            // Racchette
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
-            ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
+function checkGameEnd() {
+    if (leftScore >= maxScore) {
+        gameOver = true;
+        sndSottofondo.pause();
+        sndVittoria.play();
+        setTimeout(resetGame, 5000); // Riavvia il gioco dopo 5 secondi
+    } else if (rightScore >= maxScore) {
+        gameOver = true;
+        sndSottofondo.pause();
+        sndSconfitta.play();
+        setTimeout(resetGame, 5000); // Riavvia il gioco dopo 5 secondi
+    }
+}
 
-            // Pallina
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-            ctx.fill();
+function resetBall() {
+ballX = canvas.width / 2;
+ballY = canvas.height / 2;
+ballSpeedX = -ballSpeedX > 0 ? 5 : -5;
+ballSpeedY = 5;
+}
 
-            // Testo punteggio
-            ctx.font = "32px Arial";
-            ctx.fillText(leftScore, canvas.width / 4, 50);
-            ctx.fillText(rightScore, 3 * canvas.width / 4, 50);
-        }
+function resetGame() {
+    leftScore = 0;
+    rightScore = 0;
+    gameOver = false;
+    resetBall();
+    sndSottofondo.currentTime = 0;
+    sndSottofondo.play();
+}
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+function draw() {
+// Sfondo
+ctx.fillStyle = "black";
+ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        gameLoop();
-    </script>
+// Linea centrale
+ctx.setLineDash([10, 10]);
+ctx.strokeStyle = "rgba(255,255,255,0.2)";
+ctx.beginPath();
+ctx.moveTo(canvas.width / 2, 0);
+ctx.lineTo(canvas.width / 2, canvas.height);
+ctx.stroke();
+
+// Racchette
+ctx.fillStyle = "white";
+ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
+ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
+
+// Pallina
+ctx.beginPath();
+ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
+ctx.fill();
+
+// Testo punteggio
+ctx.font = "32px Arial";
+ctx.fillText(leftScore, canvas.width / 4, 50);
+ctx.fillText(rightScore, 3 * canvas.width / 4, 50);
+
+// Schermata di fine gioco
+if (gameOver) {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "white";
+    ctx.font = "48px Arial";
+    ctx.textAlign = "center";
+    if (leftScore >= maxScore) {
+        ctx.fillText("VITTORIA!", canvas.width / 2, canvas.height / 2);
+    } else {
+        ctx.fillText("SCONFITTA...", canvas.width / 2, canvas.height / 2);
+    }
+    ctx.font = "20px Arial";
+    ctx.fillText("Il gioco ricomincerà a breve", canvas.width / 2, canvas.height / 2 + 50);
+    ctx.textAlign = "left"; // Ripristina l'allineamento per il punteggio
+}
+}
+
+function gameLoop() {
+update();
+draw();
+requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
 </body>
 </html>
