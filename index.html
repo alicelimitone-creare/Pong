@@ -3,291 +3,541 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Semplice Pong JS con Audio</title>
+    <title>Astroballs</title>
     <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
         body {
             margin: 0;
-            background-color: #222;
+            padding: 0;
+            background: #020208;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
-            color: white;
-            font-family: Arial, sans-serif;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #game-wrapper {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            border: 4px solid #3d5afe;
+            box-shadow: 0 0 30px #3d5afe;
+            border-radius: 12px;
+            background: radial-gradient(circle, #0a0a2a 0%, #020208 100%);
             overflow: hidden;
         }
         canvas {
-            border: 4px solid #fff;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            background-color: #000;
+            display: block;
+            width: 100%;
+            height: 100%;
         }
-        #ui {
+        
+        /* Stili per le schermate in sovrimpressione (Menu e Game Over) */
+        .screen-overlay {
             position: absolute;
-            top: 20px;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 8, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        
+        /* Schermata Iniziale */
+        #start-menu {
+            display: flex; /* Visibile di default */
+        }
+        .game-title {
+            font-size: 4rem;
+            letter-spacing: 8px;
+            color: #00e5ff;
+            text-shadow: 0 0 20px #00e5ff;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        /* Schermata di Game Over */
+        #game-over-screen {
+            display: none; /* Nascosto di default */
+        }
+        #game-over-text {
+            font-size: 3.5rem;
+            color: #ff1744;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff1744;
+            margin-bottom: 30px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+        }
+        
+        #final-score {
+            font-size: 1.5rem;
+            color: #00e5ff;
+            margin-bottom: 20px;
+        }
+
+        /* Pulsanti */
+        .menu-buttons {
+            display: flex;
+            gap: 20px;
+        }
+        button {
+            padding: 15px 35px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #00e5ff;
+            color: #020208;
+            box-shadow: 0 0 15px #00e5ff;
+        }
+        .btn-primary:hover {
+            background: #fff;
+            box-shadow: 0 0 25px #fff;
+            transform: scale(1.05);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: #ff9100;
+            border: 2px solid #ff9100;
+            box-shadow: inset 0 0 8px rgba(255,145,0,0.3), 0 0 10px #ff9100;
+        }
+        .btn-secondary:hover {
+            background: #ff9100;
+            color: #020208;
+            box-shadow: 0 0 25px #ff9100;
+            transform: scale(1.05);
+        }
+        .controls-info {
+            margin-top: 20px;
+            color: #555577;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
             text-align: center;
-            pointer-events: none;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 1.2rem;
+            color: #00e5ff;
+            text-shadow: 0 0 10px #00e5ff;
+            z-index: 5;
         }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h1>PONG</h1>
-        <p>Usa W/S per muoverti | SPAZIO per iniziare/riavviare</p>
-    </div>
-    <canvas id="pongCanvas"></canvas>
 
-    <script>
-        const canvas = document.getElementById("pongCanvas");
-        const ctx = canvas.getContext("2d");
-
-        // Configurazione dimensioni
-        canvas.width = 800;
-        canvas.height = 400;
-
-        // Proprietà della racchetta
-        const paddleWidth = 10, paddleHeight = 80;
-        let leftPaddleY = (canvas.height - paddleHeight) / 2;
-        let rightPaddleY = (canvas.height - paddleHeight) / 2;
-        const paddleSpeed = 8;
-
-        // Proprietà della pallina
-        let ballX = canvas.width / 2;
-        let ballY = canvas.height / 2;
-        let ballSize = 8;
+    <div id="game-wrapper">
+        <div id="score-display">Score: 0</div>
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
         
-        // Velocità base iniziale (più lenta) e incremento per livello
-        const baseSpeed = 3;
-        const speedIncrement = 0.5;
-        let currentLevel = 1;
-        let ballSpeedX = baseSpeed;
-        let ballSpeedY = baseSpeed;
+        <div id="start-menu" class="screen-overlay">
+            <div class="game-title">Astroballs</div>
+            <button class="btn-primary" onclick="startGame()">Inizia Partita</button>
+        </div>
 
-        // Punteggio e stato del gioco
-        let leftScore = 0;
-        let rightScore = 0;
-        const maxScore = 5;
-        let gameOver = false;
-        let gamePaused = true; // Il gioco inizia in pausa
+        <div id="game-over-screen" class="screen-overlay">
+            <div id="game-over-text">PARTITA PERSA</div>
+            <div id="final-score">Score: 0</div>
+            <div class="menu-buttons">
+                <button class="btn-primary" onclick="retryGame()">Riprova</button>
+                <button class="btn-secondary" onclick="returnToBase()">Ritorna alla base</button>
+            </div>
+        </div>
+    </div>
 
-        // --- CARICAMENTO AUDIO ---
-        const sndPallina = new Audio("Pallina colpita.wav");       // Quando la pallina viene colpita
-        const sndGoalUno = new Audio("Goal di uno.wav");           // Quando TU fai goal (nella porta destra)
-        const sndGoalAltro = new Audio("Goal dell'altro.wav");     // Quando il COMPUTER fa goal (nella porta sinistra)
-        const sndPuntiUno = new Audio("Punteggio di uno.wav");     // Quando sale il TUO punteggio
-        const sndPuntiAltro = new Audio("Punteggio dell'altro.mp3"); // Quando sale il punteggio AVVERSARIO
-        const sndVittoria = new Audio("Vittoria.wav");
-        const sndSconfitta = new Audio("Sconfitta.wav");
-        const sndSottofondo = new Audio("Musichetta in sottofondo.wav"); // Loop di sottofondo
+    <div class="controls-info">
+        Usa il <strong>MOUSE</strong> o le <strong>FRECCE DIREZIONALI</strong> per muovere la piattaforma spaziale.
+    </div>
 
-        // Configura la musica di sottofondo in loop
-        sndSottofondo.loop = true;
-        sndSottofondo.volume = 0.4;
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    
+    // Riferimenti alle UI
+    const startMenu = document.getElementById("start-menu");
+    const gameOverScreen = document.getElementById("game-over-screen");
+    const gameOverText = document.getElementById("game-over-text");
+    const scoreDisplay = document.getElementById("score-display");
+    const finalScoreDisplay = document.getElementById("final-score");
 
-        let musicStarted = false;
+    // Audio Manager
+    const AudioManager = {
+        sounds: {},
+        
+        init() {
+            // Ripristinato il percorso corretto dentro la cartella assets/
+            this.sounds.homeSound = new Audio('assets/HOME_SPACESOUND.wav');
+            this.sounds.startSound = new Audio('assets/START_SPACESOUND.wav');
+            this.sounds.swoomSound = new Audio('assets/SWOOM_PERC.wav');
+            this.sounds.victoriaSound = new Audio('assets/VITTORIA_SPACESOUND.wav');
+            this.sounds.gameOverSound = new Audio('assets/XXX_SPACESOUND.wav');
+            
+            // HOME_SPACESOUND impostata come colonna sonora di gioco principale
+            this.sounds.bgMusic = this.sounds.homeSound;
+            this.sounds.bgMusic.loop = true;
+            this.sounds.bgMusic.volume = 0.9;
+            
+            // Volumi degli effetti sonori
+            this.sounds.startSound.volume = 0.9;
+            this.sounds.swoomSound.volume = 0.9;
+            this.sounds.victoriaSound.volume = 0.9;
+            this.sounds.gameOverSound.volume = 0.9;
+        },
+        
+        play(soundName) {
+            if (this.sounds[soundName]) {
+                this.sounds[soundName].currentTime = 0;
+                this.sounds[soundName].play().catch(e => console.log('Audio play error:', e));
+            }
+        },
+        
+        stopMusic() {
+            if (this.sounds.bgMusic) {
+                this.sounds.bgMusic.pause();
+                this.sounds.bgMusic.currentTime = 0;
+            }
+            // Ferma anche la musica di vittoria se era attiva
+            this.sounds.victoriaSound.pause();
+            this.sounds.victoriaSound.currentTime = 0;
+        },
+        
+        playMusic() {
+            if (this.sounds.bgMusic) {
+                this.sounds.bgMusic.play().catch(e => console.log('Music play error:', e));
+            }
+        },
+        
+        playVictoryMusic() {
+            this.sounds.victoriaSound.loop = true;
+            this.sounds.victoriaSound.play().catch(e => console.log('Victory music error:', e));
+        }
+    };
 
-        // Input tastiera
-        const keys = {};
-        window.addEventListener("keydown", (e) => {
-            keys[e.key] = true;
+    // Stati del gioco: "menu", "playing", "gameover"
+    let currentGameState = "menu";
+    let animationId;
+    let score = 0;
 
-            // SPAZIO per iniziare/riavviare il gioco
-            if (e.code === "Space") {
-                e.preventDefault();
-                
-                if (gameOver) {
-                    // Riavvia completamente il gioco
-                    resetGame();
-                } else if (gamePaused) {
-                    // Toglie la pausa e avvia
-                    gamePaused = false;
-                    if (!musicStarted) {
-                        sndSottofondo.play().catch(err => console.log("Audio in attesa di interazione"));
-                        musicStarted = true;
+    // Configurazione Piattaforma Spaziale
+    const paddle = {
+        width: 130,
+        height: 16,
+        x: canvas.width / 2 - 65,
+        y: canvas.height - 35,
+        speed: 7,
+        dx: 0
+    };
+
+    // Configurazione Palla
+    const ball = {
+        x: canvas.width / 2,
+        y: canvas.height - 55,
+        radius: 8,
+        baseSpeed: 5,
+        maxSpeed: 10,
+        dx: 5,
+        dy: -5
+    };
+
+    // Configurazione Navicelle Nemiche
+    const alienRows = 5;
+    const alienCols = 9;
+    const alienWidth = 72;
+    const alienHeight = 22;
+    const alienPadding = 10;
+    const alienOffsetTop = 65;
+    const alienOffsetLeft = 35;
+
+    let aliens = [];
+    let alienDirection = 1;
+    let alienMoveCounter = 0;
+
+    // Generazione Flotta
+    function buildAlienFleet() {
+        aliens = [];
+        for (let c = 0; c < alienCols; c++) {
+            aliens[c] = [];
+            for (let r = 0; r < alienRows; r++) {
+                aliens[c][r] = { x: 0, y: 0, status: 1 };
+            }
+        }
+        alienDirection = 1;
+        alienMoveCounter = 0;
+    }
+
+    // Controlli
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Right" || e.key === "ArrowRight") paddle.dx = paddle.speed;
+        if (e.key === "Left" || e.key === "ArrowLeft") paddle.dx = -paddle.speed;
+    });
+
+    document.addEventListener("keyup", (e) => {
+        if (e.key === "Right" || e.key === "ArrowRight" || e.key === "Left" || e.key === "ArrowLeft") {
+            paddle.dx = 0;
+        }
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (currentGameState !== "playing") return;
+        const rect = canvas.getBoundingClientRect();
+        const relativeX = e.clientX - rect.left;
+        if (relativeX > 0 && relativeX < canvas.width) {
+            paddle.x = Math.max(0, Math.min(relativeX - paddle.width / 2, canvas.width - paddle.width));
+        }
+    });
+
+    // Disegno Elementi
+    function drawPaddle() {
+        ctx.beginPath();
+        ctx.rect(paddle.x, paddle.y, paddle.width, paddle.height);
+        ctx.fillStyle = "#3d5afe";
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "#3d5afe";
+        ctx.fill();
+        ctx.closePath();
+        
+        ctx.beginPath();
+        ctx.rect(paddle.x + 8, paddle.y + 4, paddle.width - 16, 4);
+        ctx.fillStyle = "#00e5ff";
+        ctx.fill();
+        ctx.closePath();
+        ctx.shadowBlur = 0;
+    }
+
+    function drawBall() {
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#00e5ff";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00e5ff";
+        ctx.fill();
+        ctx.closePath();
+        ctx.shadowBlur = 0;
+    }
+
+    function drawAliens() {
+        const fleetColors = ["#ff1744", "#ff5252", "#ff9100", "#ffea00", "#00e676"];
+        for (let c = 0; c < alienCols; c++) {
+            for (let r = 0; r < alienRows; r++) {
+                if (aliens[c][r].status === 1) {
+                    let alienX = (c * (alienWidth + alienPadding)) + alienOffsetLeft + (alienMoveCounter * alienDirection * 0.5);
+                    let alienY = (r * (alienHeight + alienPadding)) + alienOffsetTop;
+                    aliens[c][r].x = alienX;
+                    aliens[c][r].y = alienY;
+                    
+                    ctx.beginPath();
+                    ctx.rect(alienX, alienY, alienWidth, alienHeight);
+                    ctx.fillStyle = fleetColors[r];
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = fleetColors[r];
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            }
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    // Fisica e Collisioni
+    function detectCollisions() {
+        for (let c = 0; c < alienCols; c++) {
+            for (let r = 0; r < alienRows; r++) {
+                let a = aliens[c][r];
+                if (a.status === 1) {
+                    if (ball.x - ball.radius < a.x + alienWidth &&
+                        ball.x + ball.radius > a.x &&
+                        ball.y - ball.radius < a.y + alienHeight &&
+                        ball.y + ball.radius > a.y) {
+                        
+                        ball.dy = -ball.dy;
+                        a.status = 0;
+                        score += 10 * (alienRows - r); 
+                        scoreDisplay.innerText = `Score: ${score}`;
+                        
+                        // Riproduci SWOOM_PERC quando colpisci una navicella
+                        AudioManager.play('swoomSound');
+                        
+                        checkVictory();
                     }
                 }
             }
-        });
-        window.addEventListener("keyup", (e) => keys[e.key] = false);
-
-        function calculateSpeed() {
-            // La velocità aumenta in base al livello corrente
-            // Livello = totale punti segnati + 1
-            currentLevel = leftScore + rightScore + 1;
-            return baseSpeed + (currentLevel - 1) * speedIncrement;
         }
+    }
 
-        function update() {
-            if (gameOver || gamePaused) return;
-
-            // Movimento racchetta sinistra (Giocatore)
-            if ((keys["w"] || keys["W"]) && leftPaddleY > 0) leftPaddleY -= paddleSpeed;
-            if ((keys["s"] || keys["S"]) && leftPaddleY < canvas.height - paddleHeight) leftPaddleY += paddleSpeed;
-
-            // Movimento racchetta destra (IA semplice)
-            let centerPaddle = rightPaddleY + paddleHeight / 2;
-            if (centerPaddle < ballY - 10) rightPaddleY += paddleSpeed * 0.7;
-            else if (centerPaddle > ballY + 10) rightPaddleY -= paddleSpeed * 0.7;
-
-            // Movimento pallina
-            ballX += ballSpeedX;
-            ballY += ballSpeedY;
-
-            // Rimbalzo bordi sopra e sotto
-            if (ballY <= 0 || ballY >= canvas.height) {
-                ballSpeedY = -ballSpeedY;
-            }
-
-            // Collisione racchetta sinistra (Giocatore)
-            if (ballX <= paddleWidth) {
-                if (ballY > leftPaddleY && ballY < leftPaddleY + paddleHeight) {
-                    ballSpeedX = -ballSpeedX;
-                    ballSpeedX *= 1.05; // Piccolo incremento ad ogni colpo
-                    sndPallina.cloneNode(true).play(); // Pallina colpita dal giocatore
-                } else {
-                    // Il COMPUTER ha fatto goal nella TUA porta (sinistra)
-                    rightScore++;
-                    sndGoalAltro.play();    // Goal dell'altro (computer segna)
-                    sndPuntiAltro.play();   // Punteggio dell'altro sale
-                    checkGameEnd();
-                    if (!gameOver) resetBall();
-                }
-            }
-
-            // Collisione racchetta destra (IA)
-            if (ballX >= canvas.width - paddleWidth) {
-                if (ballY > rightPaddleY && ballY < rightPaddleY + paddleHeight) {
-                    ballSpeedX = -ballSpeedX;
-                    ballSpeedX *= 1.05;
-                    sndPallina.cloneNode(true).play(); // Pallina colpita dal computer
-                } else {
-                    // TU hai fatto goal nella porta del COMPUTER (destra)
-                    leftScore++;
-                    sndGoalUno.play();      // Goal di uno (tu segni)
-                    sndPuntiUno.play();     // Punteggio di uno sale
-                    checkGameEnd();
-                    if (!gameOver) resetBall();
-                }
+    function checkVictory() {
+        let levelCleared = true;
+        for (let c = 0; c < alienCols; c++) {
+            for (let r = 0; r < alienRows; r++) {
+                if (aliens[c][r].status === 1) levelCleared = false;
             }
         }
+        if (levelCleared) {
+            triggerGameOver("VITTORIA!", "#00e676", true);
+        }
+    }
 
-        function checkGameEnd() {
-            if (leftScore >= maxScore) {
-                gameOver = true;
-                sndSottofondo.pause();
-                sndVittoria.play();
-            } else if (rightScore >= maxScore) {
-                gameOver = true;
-                sndSottofondo.pause();
-                sndSconfitta.play();
-            }
+    function triggerGameOver(message, color, isVictory = false) {
+        currentGameState = "gameover";
+        gameOverText.innerText = message;
+        gameOverText.style.color = color;
+        gameOverText.style.textShadow = `0 0 20px ${color}`;
+        finalScoreDisplay.innerText = `Score: ${score}`;
+        gameOverScreen.style.display = "flex";
+        
+        // Ferma la colonna sonora principale del livello
+        AudioManager.stopMusic();
+        
+        // Avvia l'audio corretto a seconda dell'esito
+        if (isVictory) {
+            AudioManager.playVictoryMusic();
+        } else {
+            AudioManager.play('gameOverSound');
+        }
+    }
+
+    function update() {
+        if (currentGameState !== "playing") return;
+
+        // Muove la piattaforma
+        paddle.x += paddle.dx;
+        if (paddle.x < 0) paddle.x = 0;
+        if (paddle.x + paddle.width > canvas.width) paddle.x = canvas.width - paddle.width;
+
+        // Muove la palla
+        ball.x += ball.dx;
+        ball.y += ball.dy;
+
+        // Rimbalzi sui muri laterali
+        if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+            ball.dx = -ball.dx;
+            ball.x = ball.x - ball.radius < 0 ? ball.radius : canvas.width - ball.radius;
         }
 
-        function resetBall() {
-            ballX = canvas.width / 2;
-            ballY = canvas.height / 2;
+        // Rimbalzo sulla parte superiore
+        if (ball.y - ball.radius < 0) {
+            ball.dy = -ball.dy;
+            ball.y = ball.radius;
+        }
+
+        // Rimbalzo sulla piattaforma o Game Over
+        if (ball.y + ball.radius > paddle.y && 
+            ball.y - ball.radius < paddle.y + paddle.height &&
+            ball.x > paddle.x && 
+            ball.x < paddle.x + paddle.width) {
             
-            // Ricalcola la velocità in base al livello attuale
-            let newSpeed = calculateSpeed();
-            ballSpeedX = ballSpeedX > 0 ? -newSpeed : newSpeed;
-            ballSpeedY = newSpeed * (Math.random() > 0.5 ? 1 : -1);
+            let hitPoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+            ball.dx = hitPoint * 8;
+            ball.dy = -Math.sqrt(ball.baseSpeed * ball.baseSpeed - ball.dx * ball.dx);
+            ball.y = paddle.y - ball.radius; 
+        } else if (ball.y > canvas.height) {
+            triggerGameOver("PARTITA PERSA", "#ff1744", false);
         }
 
-        function resetGame() {
-            leftScore = 0;
-            rightScore = 0;
-            currentLevel = 1;
-            gameOver = false;
-            gamePaused = false;
-            
-            // Reset posizioni racchette
-            leftPaddleY = (canvas.height - paddleHeight) / 2;
-            rightPaddleY = (canvas.height - paddleHeight) / 2;
-            
-            // Reset pallina con velocità iniziale lenta
-            ballX = canvas.width / 2;
-            ballY = canvas.height / 2;
-            ballSpeedX = baseSpeed * (Math.random() > 0.5 ? 1 : -1);
-            ballSpeedY = baseSpeed * (Math.random() > 0.5 ? 1 : -1);
-            
-            // Riavvia musica
-            sndSottofondo.currentTime = 0;
-            sndSottofondo.play();
-            musicStarted = true;
+        // Movimento degli alieni
+        alienMoveCounter++;
+        if (alienMoveCounter > 30) {
+            alienMoveCounter = 0;
+            alienDirection *= -1;
         }
 
-        function draw() {
-            // Sfondo
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        detectCollisions();
+    }
 
-            // Linea centrale
-            ctx.setLineDash([10, 10]);
-            ctx.strokeStyle = "rgba(255,255,255,0.2)";
-            ctx.beginPath();
-            ctx.moveTo(canvas.width / 2, 0);
-            ctx.lineTo(canvas.width / 2, canvas.height);
-            ctx.stroke();
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (currentGameState !== "menu") {
+            drawAliens();
+            drawBall();
+            drawPaddle();
+        }
+    }
 
-            // Racchette
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
-            ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
+    function gameLoop() {
+        update();
+        draw();
+        animationId = requestAnimationFrame(gameLoop);
+    }
 
-            // Pallina
-            ctx.beginPath();
-            ctx.arc(ballX, ballY, ballSize, 0, Math.PI * 2);
-            ctx.fill();
+    // --- FUNZIONI DEI PULSANTI ---
 
-            // Testo punteggio
-            ctx.font = "32px Arial";
-            ctx.textAlign = "left";
-            ctx.fillText(leftScore, canvas.width / 4, 50);
-            ctx.fillText(rightScore, 3 * canvas.width / 4, 50);
-
-            // Mostra livello/velocità attuale
-            ctx.font = "16px Arial";
-            ctx.textAlign = "center";
-            ctx.fillStyle = "rgba(255,255,255,0.5)";
-            ctx.fillText("Livello: " + currentLevel, canvas.width / 2, 30);
-
-            // Schermata di pausa iniziale
-            if (gamePaused && !gameOver) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.fillStyle = "white";
-                ctx.font = "36px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText("Premi SPAZIO per iniziare", canvas.width / 2, canvas.height / 2);
-                ctx.textAlign = "left";
+    function startGame() {
+        startMenu.style.display = "none";
+        
+        AudioManager.stopMusic();
+        AudioManager.play('startSound');
+        
+        resetGameVariables();
+        currentGameState = "playing";
+        
+        // Avvia la colonna sonora principale (HOME_SPACESOUND) mezzo secondo dopo l'effetto di inizio partita
+        setTimeout(() => {
+            if (currentGameState === "playing") {
+                AudioManager.playMusic();
             }
+        }, 500);
+    }
 
-            // Schermata di fine gioco
-            if (gameOver) {
-                ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                ctx.fillStyle = "white";
-                ctx.font = "48px Arial";
-                ctx.textAlign = "center";
-                if (leftScore >= maxScore) {
-                    ctx.fillText("VITTORIA!", canvas.width / 2, canvas.height / 2);
-                } else {
-                    ctx.fillText("SCONFITTA...", canvas.width / 2, canvas.height / 2);
-                }
-                ctx.font = "20px Arial";
-                ctx.fillText("Premi SPAZIO per rigiocare", canvas.width / 2, canvas.height / 2 + 50);
-                ctx.textAlign = "left";
+    function retryGame() {
+        gameOverScreen.style.display = "none";
+        
+        AudioManager.stopMusic();
+        AudioManager.play('startSound');
+        
+        resetGameVariables();
+        currentGameState = "playing";
+        
+        setTimeout(() => {
+            if (currentGameState === "playing") {
+                AudioManager.playMusic();
             }
-        }
+        }, 500);
+    }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+    function returnToBase() {
+        gameOverScreen.style.display = "none";
+        startMenu.style.display = "flex";
+        currentGameState = "menu";
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        AudioManager.stopMusic();
+    }
 
-        gameLoop();
-    </script>
+    function resetGameVariables() {
+        paddle.x = canvas.width / 2 - paddle.width / 2;
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height - 55;
+        ball.dx = (Math.random() > 0.5 ? 5 : -5);
+        ball.dy = -5;
+        score = 0;
+        scoreDisplay.innerText = `Score: 0`;
+        buildAlienFleet();
+    }
+
+    // Inizializza l'Audio Manager e avvia il loop principale
+    AudioManager.init();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    gameLoop();
+
+</script>
+
 </body>
 </html>
